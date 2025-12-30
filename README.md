@@ -74,3 +74,77 @@ Both PCA and heatmap analyses demonstrate that:
 - Transcriptional regulation reflects underlying biological and clinical differences
 
 ---
+
+## Interactive Shiny App: Breast Cancer Feature Visualization & Prediction
+
+### Overview
+This project is an **interactive Shiny application** that explores tumor characteristics from a breast cancer dataset and allows users to **visualize feature distributions** and **predict tumor malignancy** using a logistic regression model.
+
+The app is designed to make statistical modeling and exploratory analysis **accessible and interpretable** through interactive controls.
+
+---
+
+### Data
+- **Dataset:** Breast cancer tumor measurements  
+- **Features:** Numeric tumor characteristics (e.g., radius, texture, concavity)  
+- **Target Variable:**  
+  - `B` = Benign  
+  - `M` = Malignant  
+
+Unnecessary identifier columns were removed prior to analysis.
+
+---
+
+### App Features
+
+#### 1) Interactive Feature Visualization
+- Users select a tumor feature (e.g., mean radius, texture, concavity)
+- Boxplots display the distribution of the selected feature by diagnosis
+- Users can filter by:
+  - Both tumor types
+  - Benign only
+  - Malignant only
+
+**Purpose:**  
+To visually assess which tumor characteristics differ most strongly between benign and malignant tumors.
+
+---
+
+#### 2) Logistic Regression Prediction
+A logistic regression model is trained using:
+- `radius_mean`
+- `texture_mean`
+- `concavity_mean`
+
+Users input custom values for these features, and the app:
+- Predicts tumor type (Benign or Malignant)
+- Displays the probability of malignancy
+
+**Interpretation:**  
+This allows users to see how changes in tumor characteristics influence predicted cancer risk in real time.
+
+---
+
+### Statistical Model
+- **Model type:** Logistic regression (`glm`, binomial family)
+- **Goal:** Estimate probability that a tumor is malignant
+- **Output:** Class prediction + probability score
+
+---
+
+### Learning Outcomes
+This application demonstrates:
+- Interactive data visualization with `ggplot2` and `shiny`
+- Feature-based filtering and reactive programming
+- Applied logistic regression for classification
+- Clear communication of statistical results to end users
+
+---
+
+## R Packages Used
+- **Data manipulation:** `dplyr`
+- **Visualization:** `ggplot2`, `pheatmap`
+- **Genomics:** `DESeq2`
+- **Interactivity:** `shiny`
+
+---
