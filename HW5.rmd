@@ -1,0 +1,144 @@
+---
+title: "HW5"
+author: "Ajay Shenoy"
+date: "2025-12-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 6
+)
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(tibble)
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+
+```{r}
+# Load raw counts
+counts <- read_csv("/Users/ajayshenoy/Downloads/stat 436/GSE275859_GEO_RNAseq_hg19_Counts_Merged_ordered.csv.gz")
+
+# Convert to matrix
+count_mat <- counts %>%
+column_to_rownames("Peak") %>%
+as.matrix()
+
+# Create sample metadata
+samples <- colnames(count_mat)
+
+condition <- case_when(
+grepl("MPAL-", samples) ~ "MPAL",
+grepl("AML-MP-", samples) ~ "AML-MP",
+grepl("AML-", samples) ~ "AML",
+TRUE ~ "Unknown"
+)
+
+coldata <- data.frame(
+sample = samples,
+condition = factor(condition),
+row.names = samples
+)
+```
+
+Visualization 1
+
+This PCA plot addresses the question: Do the measured gene-expression profiles naturally cluster the leukemia samples according to their biological subtypes: MPAL (Mixed-Phenotype Acute Leukemia), AML-MP (Mixed-Phenotype Acute Myeloid Leukemia), AML (Single Phenotype Acute Myeloid Leukemia). 
+
+This tests the hypothesis that MPAL's lineage ambiguity, meaning the cells do not cleanly resemble myeloid cells or lymphoid cells, is driven by transcriptional differences. Myeloid cells work with the innate immune system to eliminate harmful bacteria, and lymphoid cells work with the adaptive immune system to produce antibodies. With this knowledge, the overall goal of this visualization is to determine if the way genes are turned on or off explains the difference between the cells of the three conditions. 
+
+
+```{r}
+dds <- DESeqDataSetFromMatrix(
+countData = round(count_mat),
+colData = coldata,
+design = ~ condition
+)
+
+vst_mat <- assay(vst(dds))
+
+pca <- prcomp(t(vst_mat))
+
+pca_df <- data.frame(
+PC1 = pca$x[,1],
+PC2 = pca$x[,2],
+condition = coldata$condition,
+sample = rownames(pca$x)
+)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = condition, label = sample)) +
+geom_point(size = 4, alpha = 0.85) +
+geom_text(vjust = -0.7, size = 3.2) +
+theme_minimal(base_size = 14) +
+labs(
+title = "PCA of Leukemia RNA-seq Samples",
+subtitle = "Dimensionality reduction reveals lineage-driven clustering",
+x = paste0("PC1 (", round(summary(pca)$importance[2,1] * 100), "% variance)"),
+y = paste0("PC2 (", round(summary(pca)$importance[2,2] * 100), "% variance)"),
+color = "Leukemia Type"
+)
+```
+
+To visualize this, I used Principal Component Analysis (PCA), a dimensionality reduction method that condenses high-dimensional data into a few axes of variation. 
+
+The axes, PC1 and PC2, represent the strongest trends in the data. 
+
+Color-coding samples by condition and labeling points with Sample ID helps visualize subtype clustering and sample variation, showing us if they cluster based on biology or randomness. 
+
+However, PCA represents only the most dominant patterns, which means we cannot capture variation or smaller, biologically meaningful differences. 
+
+Even with these limitations, PCA separates AML samples from AML-MP and MPAL samples, suggesting that samples with mixed phenotype behave differently at the transcriptional level than those with a single phenotype. A mixed phenotype means cells display features of both myeloid and lymphoid lineages, which is unusual and important clinically. 
+To generate the visualization, I loaded raw HTSseq data (genes as rows, samples as columns), and applied a variance-stabilizing transformation (VST) to normalize for noise. I then performed PCA on the transposed VST matrix in order to have each point corresponding with a sample. 
+
+Visualization 2: 
+
+This heatmap answers the question: Which groups of genes vary the most across the three leukemia subtypes, and do they separate MPAL, AML-MP, and AML into distinct transcriptional groups?
+While PCA focuses on overall patterns, the heatmap provides individual gene-level information, showing exactly which genes contribute to subtype differences.  
+```{r}
+# Find 100 most variable genes
+gene_var <- apply(vst_mat, 1, var)
+top_genes <- names(sort(gene_var, decreasing = TRUE))[1:100]
+
+heat_mat <- vst_mat[top_genes, ]
+
+# Column annotation
+ann <- data.frame(condition = coldata$condition)
+rownames(ann) <- rownames(coldata)
+
+pheatmap(
+heat_mat,
+scale = "row",
+annotation_col = ann,
+clustering_distance_rows = "euclidean",
+clustering_distance_cols = "euclidean",
+clustering_method = "complete",
+fontsize_row = 3,
+fontsize_col = 9,
+main = "Top 100 Most Variable Genes Across Leukemia Samples",
+angle_col = 45,
+annotation_names_col = FALSE,
+treeheight_col = 25,
+labels_row = rownames(heat_mat),
+labels_col = colnames(heat_mat),
+fontsize = 10,
+border_color = NA
+)
+```
+I selected the top 100 most variable genes. Since these genes change the most across samples, they are more likely to represent meaningful biological differences rather than noise. 
+By using Z-score scaling, our gene expression differences are easier to compare, and also show us how much each sample deviates from a gene's average expression. 
+By applying hierarchical clustering to both genes and samples, we let the data show its own natural groupings without making any prior assumptions. These groupings are highlighted by color, allowing us to see which samples share similar expression profiles. 
+By restricting to 100 genes, we sacrifice completeness and leave out potentially informative genes. Additionally, with such a large dataset, gene labels become difficult to read, even with smaller font sizes. 
+To create the heatmap, I used the VST-normalized data (as in the PCA), computed gene-level variance to select the top 100 genes, and then used their expression patterns to cluster samples. This allows us to determine which specific genes drive the differences observed in the PCA.
+
+Overall, both our visualizations show us differences between Acute Myeloid Leukemia, Acute Myeloid Leukemia with Mixed Phenotype, and Mixed Phenotype Acute Leukemia. The PCA shows that MPAL and AML-MP have their own transcriptional space, consistent with their mixed-lineage biology. The heatmap identifies what specific genes contribute to the separation. These genes are associated with T-cell identity, myeloid differentiation, and cellular stemness, all patterns that align with the known biology of the three conditions. An example is genes U2AF1 and CD3D, which are involved in lineage-specific signaling and stem-cell-like behavior, to help explain the difference in mixed phenotypic conditions and singular phenotypic conditions. 
+Overall, PCA and the heatmap show the broad structure across the three leukemia types and the gene-level drivers that cause those differences. 
+   
